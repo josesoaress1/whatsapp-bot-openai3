@@ -11,26 +11,23 @@ app.use(bodyParser.json());
 
 app.post("/webhook/receive", async (req, res) => {
   try {
-    console.log("📩 Corpo completo recebido:", JSON.stringify(req.body, null, 2));
-
-    // Corrigido de acordo com estrutura da Z-API
     const message = req.body?.text?.message;
     const number = req.body?.phone;
 
     if (!message || !number) {
-      console.log("❌ Mensagem ou número não detectado.");
+      console.log("Mensagem ou número não detectado.");
+      console.log("Corpo completo recebido:", req.body);
       return res.sendStatus(400);
     }
 
     console.log(`✅ Mensagem recebida de ${number}: ${message}`);
 
-    // Requisição para OpenAI
+    // Requisição para OpenAI com gpt-3.5-turbo
     const openaiResponse = await axios.post(
-      "https://api.openai.com/v1/completions",
+      "https://api.openai.com/v1/chat/completions",
       {
-        model: "text-davinci-003",
-        prompt: message,
-        max_tokens: 100,
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: message }],
         temperature: 0.7,
       },
       {
@@ -41,10 +38,10 @@ app.post("/webhook/receive", async (req, res) => {
       }
     );
 
-    const resposta = openaiResponse.data.choices[0].text.trim();
+    const resposta = openaiResponse.data.choices[0].message.content.trim();
     console.log(`🤖 Resposta gerada: ${resposta}`);
 
-    // Envia resposta via WhatsApp (Z-API)
+    // Envia mensagem via API do WhatsApp
     await axios.post(process.env.WHATSAPP_API_URL, {
       phone: number,
       message: resposta,
