@@ -1,39 +1,59 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const dotenv = require("dotenv");
 const axios = require("axios");
-const OpenAI = require("openai");
+const dotenv = require("dotenv");
 
 dotenv.config();
 const app = express();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const port = process.env.PORT || 10000;
 
 app.use(bodyParser.json());
 
 app.post("/webhook/receive", async (req, res) => {
-  const message = req.body.message?.text?.body || "Mensagem não encontrada";
-  const number = req.body.message?.from;
-
-  if (!message || !number) return res.sendStatus(400);
-
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: message }],
-    });
+    const message = req.body?.message?.text?.body;
+    const number = req.body?.message?.from;
 
-    const reply = response.choices[0].message.content;
+    if (!message || !number) {
+      console.log("Mensagem ou número não detectado.");
+      return res.sendStatus(400);
+    }
 
-    await axios.post(`${process.env.WHATSAPP_API_URL}`, {
+    console.log(`Mensagem recebida de ${number}: ${message}`);
+
+    // Requisição para OpenAI
+    const openaiResponse = await axios.post(
+      "https://api.openai.com/v1/completions",
+      {
+        model: "text-davinci-003",
+        prompt: message,
+        max_tokens: 100,
+        temperature: 0.7,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const resposta = openaiResponse.data.choices[0].text.trim();
+    console.log(`Resposta gerada: ${resposta}`);
+
+    // Envio da resposta pelo WhatsApp
+    await axios.post(process.env.WHATSAPP_API_URL, {
       phone: number,
-      message: reply,
+      message: resposta,
     });
 
     res.sendStatus(200);
   } catch (error) {
-    console.error("Erro ao processar:", error.message);
+    console.error("Erro ao processar a mensagem:", error.response?.data || error.message);
     res.sendStatus(500);
   }
 });
 
-app.listen(10000, () => console.log("Servidor rodando na porta 10000"));
+app.listen(port, () => {
+  console.log(`Servidor rodando na porta ${port}`);
+});
