@@ -1,55 +1,60 @@
-require('dotenv').config();
-const express = require('express');
-const axios = require('axios');
-const bodyParser = require('body-parser');
+const express = require("express");
+const axios = require("axios");
+const dotenv = require("dotenv");
+const { Configuration, OpenAIApi } = require("openai");
+
+// Carrega variáveis de ambiente
+dotenv.config();
 
 const app = express();
-app.use(bodyParser.json());
+const port = process.env.PORT || 3000;
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL;
+app.use(express.json());
 
-app.post('/webhook/receber', async (req, res) => {
-  const body = req.body;
-  const numero = body.numero || body.from;
-  const mensagem = body.mensagem || body.body;
+// Configuração da OpenAI
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
 
-  console.log('Mensagem recebida:', mensagem);
+// Rota principal (opcional)
+app.get("/", (req, res) => {
+  res.send("Bot do WhatsApp com OpenAI está rodando!");
+});
 
+// Webhook para mensagens recebidas
+app.post("/webhook/receive", async (req, res) => {
   try {
-    const chatResponse = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4',
-        messages: [
-          { role: 'system', content: 'Você é um atendente simpático de uma loja de produtos naturais.' },
-          { role: 'user', content: mensagem }
-        ],
-        temperature: 0.7
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    const message = req.body.message?.body;
+    const number = req.body.message?.from;
 
-    const resposta = chatResponse.data.choices[0].message.content;
+    if (!message || !number) {
+      return res.status(400).send("Mensagem inválida.");
+    }
 
-    await axios.post(WHATSAPP_API_URL, {
-      phone: numero,
-      message: resposta
+    console.log(`Mensagem recebida de ${number}: ${message}`);
+
+    // Gera resposta com OpenAI
+    const completion = await openai.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: message }],
+    });
+
+    const reply = completion.data.choices[0].message.content;
+
+    // Envia resposta para o WhatsApp
+    await axios.post(process.env.WHATSAPP_API_URL, {
+      phone: number,
+      message: reply,
     });
 
     res.sendStatus(200);
   } catch (error) {
-    console.error('Erro ao processar mensagem:', error.response?.data || error.message);
+    console.error("Erro ao processar a mensagem:", error.message);
     res.sendStatus(500);
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+app.listen(port, () => {
+  console.log(`Servidor rodando na porta ${port}`);
 });
