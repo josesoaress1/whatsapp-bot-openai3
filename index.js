@@ -1,60 +1,39 @@
 const express = require("express");
-const axios = require("axios");
+const bodyParser = require("body-parser");
 const dotenv = require("dotenv");
-const { Configuration, OpenAIApi } = require("openai");
+const axios = require("axios");
+const OpenAI = require("openai");
 
-// Carrega variáveis de ambiente
 dotenv.config();
-
 const app = express();
-const port = process.env.PORT || 3000;
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-app.use(express.json());
+app.use(bodyParser.json());
 
-// Configuração da OpenAI
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
-
-// Rota principal (opcional)
-app.get("/", (req, res) => {
-  res.send("Bot do WhatsApp com OpenAI está rodando!");
-});
-
-// Webhook para mensagens recebidas
 app.post("/webhook/receive", async (req, res) => {
+  const message = req.body.message?.text?.body || "Mensagem não encontrada";
+  const number = req.body.message?.from;
+
+  if (!message || !number) return res.sendStatus(400);
+
   try {
-    const message = req.body.message?.body;
-    const number = req.body.message?.from;
-
-    if (!message || !number) {
-      return res.status(400).send("Mensagem inválida.");
-    }
-
-    console.log(`Mensagem recebida de ${number}: ${message}`);
-
-    // Gera resposta com OpenAI
-    const completion = await openai.createChatCompletion({
+    const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [{ role: "user", content: message }],
     });
 
-    const reply = completion.data.choices[0].message.content;
+    const reply = response.choices[0].message.content;
 
-    // Envia resposta para o WhatsApp
-    await axios.post(process.env.WHATSAPP_API_URL, {
+    await axios.post(`${process.env.WHATSAPP_API_URL}`, {
       phone: number,
       message: reply,
     });
 
     res.sendStatus(200);
   } catch (error) {
-    console.error("Erro ao processar a mensagem:", error.message);
+    console.error("Erro ao processar:", error.message);
     res.sendStatus(500);
   }
 });
 
-app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`);
-});
+app.listen(10000, () => console.log("Servidor rodando na porta 10000"));
