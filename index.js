@@ -11,8 +11,10 @@ app.use(bodyParser.json());
 
 app.post("/webhook/receive", async (req, res) => {
   try {
-    const message = req.body?.message?.text?.body;
-    const number = req.body?.message?.from;
+    console.log("Corpo completo recebido:", JSON.stringify(req.body, null, 2));
+
+    const message = req.body?.message;
+    const number = req.body?.phone;
 
     if (!message || !number) {
       console.log("Mensagem ou número não detectado.");
@@ -21,7 +23,7 @@ app.post("/webhook/receive", async (req, res) => {
 
     console.log(`Mensagem recebida de ${number}: ${message}`);
 
-    // Requisição para OpenAI
+    // Requisição à OpenAI
     const openaiResponse = await axios.post(
       "https://api.openai.com/v1/completions",
       {
