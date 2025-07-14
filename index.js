@@ -11,19 +11,20 @@ app.use(bodyParser.json());
 
 app.post("/webhook/receive", async (req, res) => {
   try {
-    console.log("Corpo completo recebido:", JSON.stringify(req.body, null, 2));
+    console.log("📩 Corpo completo recebido:", JSON.stringify(req.body, null, 2));
 
-    const message = req.body?.message;
+    // Corrigido de acordo com estrutura da Z-API
+    const message = req.body?.text?.message;
     const number = req.body?.phone;
 
     if (!message || !number) {
-      console.log("Mensagem ou número não detectado.");
+      console.log("❌ Mensagem ou número não detectado.");
       return res.sendStatus(400);
     }
 
-    console.log(`Mensagem recebida de ${number}: ${message}`);
+    console.log(`✅ Mensagem recebida de ${number}: ${message}`);
 
-    // Requisição à OpenAI
+    // Requisição para OpenAI
     const openaiResponse = await axios.post(
       "https://api.openai.com/v1/completions",
       {
@@ -41,9 +42,9 @@ app.post("/webhook/receive", async (req, res) => {
     );
 
     const resposta = openaiResponse.data.choices[0].text.trim();
-    console.log(`Resposta gerada: ${resposta}`);
+    console.log(`🤖 Resposta gerada: ${resposta}`);
 
-    // Envio da resposta pelo WhatsApp
+    // Envia resposta via WhatsApp (Z-API)
     await axios.post(process.env.WHATSAPP_API_URL, {
       phone: number,
       message: resposta,
@@ -51,11 +52,11 @@ app.post("/webhook/receive", async (req, res) => {
 
     res.sendStatus(200);
   } catch (error) {
-    console.error("Erro ao processar a mensagem:", error.response?.data || error.message);
+    console.error("❗ Erro ao processar a mensagem:", error.response?.data || error.message);
     res.sendStatus(500);
   }
 });
 
 app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`);
+  console.log(`🚀 Servidor rodando na porta ${port}`);
 });
